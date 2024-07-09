@@ -29,7 +29,7 @@ maxDeferrals="${9:-"3"}"
 dir="/Users/Shared/Lab9Pro/auto-app-updater"
 scriptname="/auto-app-updater.zsh"
 fullpath=$dir$scriptname
-scriptURL="https://raw.githubusercontent.com/RafVandelaer/macOS-scripts/main/Intune-fundamentals/Auto%20app%20updater/auto-app-updater.zsh"
+scriptURL="https://raw.githubusercontent.com/Lab9Pro-AL/Intune/main/auto-app-updater/auto-app-updater.zsh"
 
 mkdir $dir
 
