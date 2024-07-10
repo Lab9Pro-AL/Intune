@@ -11,7 +11,7 @@
 #                       Script frequency : Every week                                                       #
 #                       Number of times to retry if script fails : 3                                        #
 #                                                                                                           #
-#                   Logs can be found in /private/var/log/intune                                            #
+#                   Logs can be found in /var/log/intune                                                    #
 #                                                                                                           #
 #############################################################################################################
 
