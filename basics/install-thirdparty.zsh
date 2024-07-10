@@ -73,14 +73,14 @@ checkAppVersion(){
     scriptURL=$2
     #checking old and new MD5 of file
     storedMD5=$(<"$dir/$APP.md5")
-    newMD5=$(curl -sL $scriptURL | md5)
+    newMD5=$(curl -sL $scriptURL |  grep '"tag_name":')
     if [[ "$storedMD5" == "$newMD5" ]]; then
         logging "Same file version on server for $APP, no need to do anything..."
         #if md5 are the same, no need to download again.
     else
         logging "OTHER file version on server for $APP, downloading..."
         #other md5 -> need to download newer script and change the stored MD5
-        curl -sL $scriptURL | md5 > $dir/$APP.md5
+        curl -sL $scriptURL |   grep '"tag_name":' > $dir/$APP.md5
         installApp $APP $scriptURL
     fi
 
