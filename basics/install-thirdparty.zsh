@@ -72,7 +72,7 @@ checkAppVersion(){
     APP=$1
     scriptURL=$2
     #checking old and new MD5 of file
-    storedMD5=$(<"$dir/$APP.md5")
+    storedMD5=$(<"$dir/$APP.version")
     newMD5=$(curl -sL $scriptURL |  grep '"tag_name":')
     if [[ "$storedMD5" == "$newMD5" ]]; then
         logging "Same file version on server for $APP, no need to do anything..."
@@ -80,14 +80,14 @@ checkAppVersion(){
     else
         logging "OTHER file version on server for $APP, downloading..."
         #other md5 -> need to download newer script and change the stored MD5
-        curl -sL $scriptURL |   grep '"tag_name":' > $dir/$APP.md5
+        curl -sL $scriptURL |   grep '"tag_name":' > $dir/$APP.version
         installApp $APP $scriptURL
     fi
 
 }
 #base vars
 logFolder="/var/log/intune"
-dir="/Users/Shared/Lab9Pro/md5check"
+dir="/Users/Shared/Lab9Pro/versioncheck"
 mkdir $dir
 installomatorRepo="https://api.github.com/repos/Installomator/Installomator/releases/latest"
 dockutilRepo="https://api.github.com/repos/kcrawford/dockutil/releases/latest"
