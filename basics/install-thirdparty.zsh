@@ -116,24 +116,24 @@ install-privileges-helper(){
                 helperPlistPath="/Library/LaunchDaemons/corp.sap.privileges.helper.plist"
             
                 /bin/cat > "$helperPlistPath" << EOF
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>Label</key>
-            <string>corp.sap.privileges.helper</string>
-            <key>MachServices</key>
-            <dict>
-                <key>corp.sap.privileges.helper</key>
-                <true/>
-            </dict>
-            <key>ProgramArguments</key>
-            <array>
-                <string>/Library/PrivilegedHelperTools/corp.sap.privileges.helper</string>
-            </array>
-        </dict>
-        </plist>
-        EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>corp.sap.privileges.helper</string>
+    <key>MachServices</key>
+    <dict>
+        <key>corp.sap.privileges.helper</key>
+        <true/>
+    </dict>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Library/PrivilegedHelperTools/corp.sap.privileges.helper</string>
+    </array>
+</dict>
+</plist>
+EOF
 
                 /bin/chmod 644 "$helperPlistPath"
                 
