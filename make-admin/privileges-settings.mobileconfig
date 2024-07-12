@@ -14,6 +14,8 @@
 						<dict>
 							<key>mcx_preference_settings</key>
 							<dict>
+								<key>DockToggleTimeout</key>
+								<integer>30</integer>
 								<key>DockToggleMaxTimeout</key>
 								<integer>30</integer>
                                 <key>RequireAuthentication</key>

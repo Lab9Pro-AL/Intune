@@ -3,7 +3,10 @@
 #############################################################################################################
 #                                      Created by Raf Vandelaer                                             #
 #                                                                                                           #
-#                 Script to install the third party tools in Intune.                                        #
+#                     *************  One script to rule them all *************                              #
+#                                                                                                           #
+#                                                                                                           #
+#                 Script to install the fundamentals install in Intune.                                     #
 #                  This script checks the version of the script and downloads                               #
 #                  a newer version if available. Config with the following settings:                        #
 #                       Run script as signed-in user : No                                                   #
@@ -14,7 +17,6 @@
 #                   Logs can be found in /var/log/intune                                                    #
 #                                                                                                           #
 #############################################################################################################
-
 
 ########################################### Parameters to modify #########################################################
 
