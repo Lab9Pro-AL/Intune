@@ -169,7 +169,7 @@ maxDeferrals="${9:-"3"}"                                                        
 
 ### Script Log and General Behavior Options ###
 
-scriptLog="/var/log/com.autopatch-lab9pro.log"                                  # Script Log Location [ /var/log/com.company.log ] (i.e., Your organization's default location for client-side logs)
+scriptLog="/var/log/intune/autopatch-lab9pro.log"                                  # Script Log Location [ /var/log/com.company.log ] (i.e., Your organization's default location for client-side logs)
 debugMode="false"                                                               # Debug Mode [ true | false (default) | verbose ] Verbose adds additional logging, debug turns Installomator script to DEBUG 2, false for production
 outdatedOsAction="/System/Library/CoreServices/Software Update.app"             # Outdated OS Action [ /System/Library/CoreServices/Software Update.app (default) | jamfselfservice://content?entity=policy&id=117&action=view ] (i.e., Jamf Pro Self Service policy ID for operating system upgrades)
 

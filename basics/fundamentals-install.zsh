@@ -18,11 +18,12 @@
 #                                                                                                           #
 #############################################################################################################
 
+
 ########################################### Parameters to modify #########################################################
 
 		#check in the intake document if the customer would like to be possible to get admin rights for 30 min.
 		#if so, change to following variable to true
-		isAdminAllowed=true
+		isAllowedToBecomeAdmin=true
 
 		#Type the labels you want to install on the endpoints. Double check the labels using the link in the following line.
 		#you can choose other apps for intel or arm (Apple Mx) architecture. ARM64 = Apple Mx.
@@ -85,20 +86,20 @@ main() {
     if [ -f $firstrun ]; then
 		#if not firstrun, updating software. 
 		#checking if file exists
-		logging "Not first run so we need to run auto-updater"
+		logging "Not first run so we need to run auto-updater. Check autopatch-lab9pro.log for more info"
 		if [ -f "$dir/auto-app-updater.md5" ]; then
-
 			#checking old and new MD5 of file
 			storedMD5=$(<"$dir/auto-app-updater.md5")
 			newMD5=$(curl -sL $scriptURL | md5)
 			if [[ "$storedMD5" == "$newMD5" ]]; then
-				echo "Same file on server, not downloading..."
+				logging "Same file on server, not downloading..."
 				#if md5 are the same, no need to download again.
 				#Execute the script
 				$dir/auto-app-updater.zsh null null null $interactiveMode $ignoredLabels $requiredLabels $optionalLabels $installomatorOptions $maxDeferrals
 			else
 				#other md5 -> need to download newer script and change the stored MD5
-			downloadAndRunAutoAppUpdater
+				logging "Other version of auto-patch, let's go."
+				downloadAndRunAutoAppUpdater
 			fi
 		
 		else 
@@ -113,7 +114,6 @@ main() {
         downloadAndInstallInstallomator
 		installomatorInstall depnotify
 		#running depnotify asap
-		depnotify_command "Configureren van items, even geduld."
 		configDEP
 		startDEPNotify
 		#Installing Dockutil, desktoppr, privileges
@@ -123,7 +123,7 @@ main() {
 		installomatorInstall dialog
 		
 		#if neccesary, install privileges app and it's helper-tool
-		if [ "$isAdminAllowed" = true ] ; then
+		if [ "$isAllowedToBecomeAdmin" = true ] ; then
 			installomatorInstall privileges
 			install-privileges-helper
 		fi
@@ -174,7 +174,7 @@ configDEP(){
 		log_message="$instance: Installomator 1st with DEPNotify, v$scriptVersion"
 		label="1st-v$scriptVersion"
 
-		log_location=$logFolder"Installomator-DEP.log"
+		log_location=$logFolder"/Installomator-DEP.log"
 
 		printlog "[LOG-BEGIN] ${log_message}"
 
@@ -203,6 +203,7 @@ configDEP(){
 		# MARK: Functions
 		printlog "depnotify_command function"
 		echo "" > $DEPNOTIFY_LOG || true
+		depnotify_command "Configureren van items, even geduld."
 
 		# MARK: Install DEPNotify
 		cmdOutput="$( ${destFile} depnotify LOGO=$LOGO NOTIFY=silent BLOCKING_PROCESS_ACTION=ignore LOGGING=WARN || true )"
