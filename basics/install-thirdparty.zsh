@@ -15,26 +15,13 @@
 #                                                                                                           #
 #############################################################################################################
 
+#check in the intake document if the customer would like to be possible to get admin rights for 30 min.
+#if so, change to following variable to true
+isAdminAllowed=true
 
 main() {
     #Main function of this script
-    
-    # Installs the latest release of dockutil from Github
-    if [[ -f "/usr/local/bin/dockutil" ]]; then
-		logging "Dockutil installed, checking version..."
-        checkAppVersion "Dockutil" $dockutilRepo
-	else 
-        logging "Installing Dockutil"
-	    installApp "Dockutil" $dockutilRepo
-	fi
-    # Installs the latest release of Desktoppr from Github
-    if [[ -f "/usr/local/bin/desktoppr" ]]; then
-		logging "Desktoppr installed, checking version..."
-        checkAppVersion "Desktoppr" $desktopprRepo
-	else 
-        logging "Installing Desktoppr"
-	    installApp "Desktoppr" $desktopprRepo
-	fi
+
     # Installs the latest release of Installomator from Github
     if [ -f "/usr/local/Installomator/Installomator.sh" ]; then
 		logging "installomator installed, checking version..."
@@ -44,6 +31,13 @@ main() {
         logging "Installing installomator"
 	    installApp "Installomator" $installomatorRepo
 	fi
+    #Installing Dockutil, desktoppr, privileges
+    installomatorInstall dockutil
+    installomatorInstall desktoppr
+    installomatorInstall swiftdialog
+    if [ "$isAdminAllowed" = true ] ; then
+        installomatorInstall privileges
+    fi
 }
 
 #logging
@@ -51,6 +45,16 @@ logging () {
     fixdate="$(date +%d%m%Y-%H:%M)"
 	echo $fixdate": " $1 | tee -a "$fixlog"
 }
+installomatorInstall(){
+    appToInstall=$1
+   logging "Installing "$appToInstall
+    /usr/local/Installomator/Installomator.sh $appToInstall
+}
+addtoDock (){
+     logging "adding "$1" to the dock"
+    /usr/local/bin/dockutil --add $1
+}
+
 installApp(){
     APP=$1
     repo=$2
@@ -90,8 +94,6 @@ logFolder="/var/log/intune"
 dir="/Users/Shared/Lab9Pro/versioncheck"
 mkdir $dir
 installomatorRepo="https://api.github.com/repos/Installomator/Installomator/releases/latest"
-dockutilRepo="https://api.github.com/repos/kcrawford/dockutil/releases/latest"
-desktopprRepo="https://api.github.com/repos/scriptingosx/desktoppr/releases/latest"
 
 [[ -d $logFolder ]] || mkdir $logFolder
 chmod 755 $logFolder
