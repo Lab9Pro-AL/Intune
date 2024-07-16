@@ -21,27 +21,40 @@
 
 ########################################### Parameters to modify #########################################################
 
+		#check in the intake document if the customer would like to demote the current enduser to standard user (non admin).
+		#if so, change the following variable to true, otherwise set to false
+		demoteUser=false
+
 		#check in the intake document if the customer would like to be possible to get admin rights for 30 min.
-		#if so, change to following variable to true
+		#if so, change to following variable to true, otherwise set to false
 		isAllowedToBecomeAdmin=true
 
 		#Type the labels you want to install on the endpoints. Double check the labels using the link in the following line.
 		#you can choose other apps for intel or arm (Apple Mx) architecture. ARM64 = Apple Mx.
 		#All the neccesary apps for the fundamentals install are already installed. 
 		#https://github.com/Installomator/Installomator/blob/main/Labels.txt
-
 		if [[ $(arch) == "arm64" ]]; then
-			items=(microsoftautoupdate theunarchiver microsoftoffice365 microsoftedge microsoftteams microsoftonedrive microsoftdefender microsoftcompanyportal displaylinkmanager)
+			#items=(microsoftautoupdate microsoftoffice365 microsoftedge microsoftteams microsoftonedrive microsoftdefender microsoftcompanyportal )
+			items=(microsoftautoupdate )
 			# displaylinkmanager
 		else
-			items=(microsoftautoupdate theunarchiver microsoftoffice365 microsoftedge microsoftteams microsoftonedrive microsoftdefender microsoftcompanyportal)
+			items=(microsoftautoupdate microsoftoffice365 microsoftedge microsoftteams microsoftonedrive microsoftdefender microsoftcompanyportal)
 		fi
+
+		#Check in the intake document which items the customer wants to add to the dock. Standard Apple Items are being removed. 
+		#All Microsoft items should be contained. DO NOT FORGET THE .APP extension!!!!!!!!!!!!!!!!!!!!!!
+		dockitems=('/Applications/Microsoft Outlook.app' '/Applications/Microsoft Edge.app' '/Applications/Microsoft Teams.app' '/Applications/Microsoft Word.app' '/Applications/Microsoft Excel.app')
+		
+
+########################################### Parameters to modify /end #########################################################
+
 
 	#Installomator variables, here you can configure which labels need to be updated with auto updater. Alternativly copy paste from above.
 		interactiveMode="${4:="2"}"                             # Parameter 4: Interactive Mode [ 0 (Completely Silent) | 1 (Silent Discovery, Interactive Patching) | 2 (Full Interactive) (default) ]
 		ignoredLabels="${5:=""}"                                # Parameter 5: A space-separated list of Installomator labels to ignore (i.e., "microsoft* googlechrome* jamfconnect zoom* 1password* firefox* swiftdialog")
 		requiredLabels="${6:=""}"                               # Parameter 6: A space-separated list of required Installomator labels (i.e., "firefoxpkg_intl")
 		optionalLabels="${7:=""}"                               # Parameter 7: A space-separated list of optional Installomator labels (i.e., "renew") ** Does not support wildcards **
+		#is overrun below
 		installomatorOptions="${8:-""}"                         # Parameter 8: A space-separated list of options to override default Installomator options (i.e., BLOCKING_PROCESS_ACTION=prompt_user NOTIFY=silent LOGO=appstore)
 		maxDeferrals="${9:-"3"}" 
 
@@ -66,20 +79,22 @@ scriptVersion="9.11"
 # Command-file to DEPNotify
 DEPNOTIFY_LOG="/var/tmp/depnotify.log"
 firstrun="/Users/Shared/Lab9Pro/firstrun"
+wallpaperIsSet="/Users/Shared/Lab9Pro/wallpaperIsSet"
 # Counters
 errorCount=0
 
 countLabels=${#items[@]}
 #vars for our helper script
 dir="/Users/Shared/Lab9Pro/auto-app-updater"
+wallpaper="/Users/Shared/Lab9Pro/company-wallpaper.jpg"
 scriptname="/auto-app-updater.zsh"
 fullpath=$dir$scriptname
-scriptURL="https://raw.githubusercontent.com/RafVandelaer/macOS-scripts/main/Intune-fundamentals/Auto%20app%20updater/auto-app-updater.zsh"
+scriptURL="https://raw.githubusercontent.com/Lab9Pro-AL/Intune/main/auto-app-updater/auto-app-updater.zsh"
 
 mkdir $dir
 
 main() {
-    #Main function of this script
+    #Main function of this script, here is where the magic happens
 
 	#checking if first run, if so we deploy all software and run DEPnotify
 	# Installs the latest release of Installomator from Github
@@ -95,7 +110,7 @@ main() {
 				logging "Same file on server, not downloading..."
 				#if md5 are the same, no need to download again.
 				#Execute the script
-				$dir/auto-app-updater.zsh null null null $interactiveMode $ignoredLabels $requiredLabels $optionalLabels $installomatorOptions $maxDeferrals
+				$fullpath null null null $interactiveMode $ignoredLabels $requiredLabels $optionalLabels $installomatorOptions $maxDeferrals
 			else
 				#other md5 -> need to download newer script and change the stored MD5
 				logging "Other version of auto-patch, let's go."
@@ -106,36 +121,116 @@ main() {
 			#if  no md5 available -> creating for future checks, downloading and running script
 		downloadAndRunAutoAppUpdater
 		fi
+		#checking if wallpaper is previously set, if not... checking if file is available and if so, setting.
+		checkAndSetWallpaper
+
+	#if first run, we need to install all the software first and run the DEPNotify	
 	else 
 		logging "This is first run... Installing all apps and running DEPNotify."
-		#if first run, we need to install all the software first and run the DEPNotify
 		
 		touch $firstrun
+		#installing basic needs so we can show user the progress
         downloadAndInstallInstallomator
 		installomatorInstall depnotify
+		#adding items to list to install
+		items+=("dockutil")
+		items+=("desktoppr")
+		items+=("swiftdialog")
+		items+=("dialog")
 		#running depnotify asap
+		logging "configuring DEPNotify"
 		configDEP
+		logging "Starting DEPNotify"
 		startDEPNotify
-		#Installing Dockutil, desktoppr, privileges
-		installomatorInstall dockutil
-		installomatorInstall desktoppr
-		installomatorInstall swiftdialog
-		installomatorInstall dialog
-		
-		#if neccesary, install privileges app and it's helper-tool
+		logging "Items to install: ${items[*]}"
+
+		logging "Running DEPNotify and installing all apps. Check /var/log/intune/Installomator-DEP.log"
+		runDEP
+		#if neccesary, install privileges app and it's helper-tool, adding to dock too.
 		if [ "$isAllowedToBecomeAdmin" = true ] ; then
 			installomatorInstall privileges
 			install-privileges-helper
+			dockitems+=("/Applications/Privileges.app")
 		fi
-		logging "Running DEPNotify and installing all apps"
-		runDEP
-		logging "All done for this round"
+		logging "checking if wallpaper is already available."
+		checkAndSetWallpaper
+		logging "demoting user if configured"
+		demoteUserToStandard
+		logging "Customizing dock..."
+		createDock
+		endDEP
+		logging "All done for now"
+	
+	fi
+	caffexit 0
+}
+function createDock(){
+	#getting latest index so we can restart dock
+	depnotify_command "Status: Configuring dock"
+
+	#removing items
+	currentDesktopUser=$( echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ { print $3 }' )
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Berichten --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Mail --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove "Foto's" --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Kaarten --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove FaceTime --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Contacten --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Notities --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Herrineringen --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove FreeForm --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove TV --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Muziek --no-restart
+
+		for item in "${dockitems[@]}"; do
+			sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --add $item --no-restart
+		done
+	killall -KILL Dock
+
+}
+function demoteUserToStandard () {
+	if [ $demoteUser = true]; then
+	currentAdminUser="$(stat -f "%Su" /dev/console)"
+		sudo dseditgroup -o edit -d "$currentAdminUser" -t user admin 
+		errcode=$? 
+			if [ "$errcode" -ne 0 ]; 
+				then 
+				logging "couldn't demote user to standard..."
+			fi 
+		logging "Admin rights revoked for user $currentAdminUser"
+		depnotify_command "Status: Revoking admin rights for user $currentAdminUser"
+	else
+		logging "No demoting needed"
+	fi
+}
+function checkAndSetWallpaper  () {
+	currentDesktopUser=$( echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ { print $3 }' )
+	#checking if wallpaper was already set
+	if [[ ! -f $wallpaperIsSet ]]; then
+		#if not set, setting once, if file is available
+		if [[ -f $wallpaper ]]; then
+
+			$wallpaper | md5 > $wallpaperIsSet
+			logging "wallpaper available and not yet configured, configuring..."
+			sudo -u "$currentDesktopUser" /usr/local/bin/desktoppr $wallpaper
+			depnotify_command "Status: Setting wallpaper"
+		else
+			logging "wallpaper not yet available or never configured"
+		fi
+	#if already set, checking if wallpaper is newer.
+	else
+		logging "wallpaper was already set, checking if file is newer"
+		storedMD5=$(<"$wallpaperIsSet")
+		newMD5=$($wallpaper | md5)
+		if [[ "$storedMD5" = "$newMD5" ]]; then
+			logging "wallpaper is the same, not changing"
+		else
+			sudo -u "$currentDesktopUser" /usr/local/bin/desktoppr $wallpaper
+		fi
 	fi
 	
-    exit 0
 }
-
-function downloadAndRunAutoAppUpdater {
+function downloadAndRunAutoAppUpdater () {
     echo "Downloading new file and executing."
      curl -sL $scriptURL | md5 > $dir/auto-app-updater.md5
     # Download the script from the given URL
@@ -143,7 +238,7 @@ function downloadAndRunAutoAppUpdater {
     # Make the script executable
      chmod +x $fullpath
     #Execute the script
-      $dir/auto-app-updater.zsh null null null $interactiveMode $ignoredLabels $requiredLabels $optionalLabels $installomatorOptions $maxDeferrals
+      $fullpath null null null $interactiveMode $ignoredLabels $requiredLabels $optionalLabels $installomatorOptions $maxDeferrals
 
 }
 
@@ -203,7 +298,10 @@ configDEP(){
 		# MARK: Functions
 		printlog "depnotify_command function"
 		echo "" > $DEPNOTIFY_LOG || true
-		depnotify_command "Configureren van items, even geduld."
+
+		depnotify_command "Command: MainTitle: $title"
+    	depnotify_command "Command: Image: $LOGO_PATH"
+		depnotify_command "Status: Controle van toestel, even geduld."
 
 		# MARK: Install DEPNotify
 		cmdOutput="$( ${destFile} depnotify LOGO=$LOGO NOTIFY=silent BLOCKING_PROCESS_ACTION=ignore LOGGING=WARN || true )"
@@ -249,9 +347,9 @@ runDEP(){
 			fi
 			itemName=$( ${destFile} ${item} RETURN_LABEL_NAME=1 LOGGING=REQ INSTALL=force | tail -1 || true )
 			if [[ "$itemName" != "#" ]]; then
-				depnotify_command "Status: installeren van $itemName…"
+				depnotify_command "Status: Installeren van $itemName…"
 			else
-				depnotify_command "Status: installeren van $item…"
+				depnotify_command "Status: Installeren van $item…"
 			fi
 			printlog "$item $itemName"
 			cmdOutput="$( ${destFile} ${item} LOGO=$LOGO ${installomatorOptions} || true )"
@@ -272,14 +370,17 @@ runDEP(){
 			((countLabels--))
 			itemName=""
 		done
+	
 
-		# MARK: Finishing
-		# Prevent re-run of script if conditionFile is set
-		if [[ ! -z "$conditionFile" ]]; then
-			printlog "Touching condition file so script will not run again"
-			touch "$conditionFile" || true
-			printlog "$(ls -al "$conditionFile" || true)"
-		fi
+}
+endDEP(){
+	# Prevent re-run of script if conditionFile is set
+	#OLD condition file is replaced with own
+		# if [[ ! -z "$conditionFile" ]]; then
+		# 	printlog "Touching condition file so script will not run again"
+		# 	touch "$conditionFile" || true
+		# 	printlog "$(ls -al "$conditionFile" || true)"
+		# fi
 
 		# Show error to user if any
 		printlog "Errors: $errorCount"
@@ -298,8 +399,7 @@ runDEP(){
 		printlog "Remove $(rm -fv $DEPNOTIFY_LOG || true)"
 
 		printlog "Ending"
-		caffexit $errorCount
-
+		
 }
 caffexit () {
     kill "$caffeinatepid" || true
