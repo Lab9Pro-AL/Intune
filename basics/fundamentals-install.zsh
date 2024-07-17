@@ -83,7 +83,6 @@ wallpaperIsSet="/Users/Shared/Lab9Pro/wallpaperIsSet"
 # Counters
 errorCount=0
 
-countLabels=${#items[@]}
 #vars for our helper script
 dir="/Users/Shared/Lab9Pro/auto-app-updater"
 wallpaper="/Users/Shared/Lab9Pro/company-wallpaper.jpg"
@@ -143,6 +142,7 @@ main() {
 		logging "Starting DEPNotify"
 		startDEPNotify
 		logging "Items to install: ${items[*]}"
+		countLabels=${#items[@]}
 
 		logging "Running DEPNotify and installing all apps. Check /var/log/intune/Installomator-DEP.log"
 		runDEP
