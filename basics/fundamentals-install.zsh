@@ -65,7 +65,7 @@ installomatorOptions="NOTIFY=silent BLOCKING_PROCESS_ACTION=ignore INSTALL=force
 
 # DEPNotify display settings, change as desired
 title="Installeren van apps"
-message="Gelieve even te wachten, de apps worden gedownload en geïnstalleerd. U kan het toesel in beperkte mate gebruiken."
+message="Gelieve even te wachten, de apps worden gedownload en geïnstalleerd. U kan het toestel in beperkte mate gebruiken."
 endMessage="Installatie klaar! Custom aangevraagde apps worden later geïnstalleerd."
 errorMessage="Er was een probleem met de installatie van de apps. Gelieve IT te contacteren."
 
