@@ -34,11 +34,11 @@
 		#All the neccesary apps for the fundamentals install are already installed. 
 		#https://github.com/Installomator/Installomator/blob/main/Labels.txt
 		if [[ $(arch) == "arm64" ]]; then
-			#items=(microsoftautoupdate microsoftoffice365 microsoftedge microsoftteams microsoftonedrive microsoftdefender microsoftcompanyportal )
+			#items=(microsoftautoupdate microsoftofficebusinesspro microsoftedge microsoftteamsnew microsoftonedrive microsoftdefender microsoftcompanyportal )
 			items=(microsoftautoupdate )
 			# displaylinkmanager
 		else
-			items=(microsoftautoupdate microsoftoffice365 microsoftedge microsoftteams microsoftonedrive microsoftdefender microsoftcompanyportal)
+			items=(microsoftautoupdate microsoftofficebusinesspro microsoftedge microsoftteamsnew microsoftonedrive microsoftdefender microsoftcompanyportal)
 		fi
 
 		#Check in the intake document which items the customer wants to add to the dock. Standard Apple Items are being removed. 
@@ -189,7 +189,7 @@ function createDock(){
 
 }
 function demoteUserToStandard () {
-	if [ $demoteUser = true]; then
+	if [ "$demoteUser" = true]; then
 	currentAdminUser="$(stat -f "%Su" /dev/console)"
 		sudo dseditgroup -o edit -d "$currentAdminUser" -t user admin 
 		errcode=$? 
