@@ -1,5 +1,5 @@
 #!/bin/zsh
-
+#this functionality is available in the fundamentals-install.zsh
 
 #############################################################################################################
 #                                      Created by Raf Vandelaer                                             #

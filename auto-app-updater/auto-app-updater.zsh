@@ -245,8 +245,8 @@ useOverlayIcon="true"                                                           
 if [[ "$useOverlayIcon" == "true" ]]; then
     #xxd -p -s 260 "$(defaults read /Library/Preferences/com.jamfsoftware.jamf self_service_app_path)"/Icon$'\r'/..namedfork/rsrc | xxd -r -p > /var/tmp/overlayicon.icns
     #overlayicon="/var/tmp/overlayicon.icns"
-     if [ -f "/Users/Shared/company-logo.icns"]; then 
-        overlayicon="/Users/Shared/company-logo.icns"
+     if [ -f "/Users/Shared/Lab9Pro/company-logo.icns"]; then 
+        overlayicon="/Users/Shared/Lab9Pro/company-logo.icns"
     else
         overlayicon="/Library/Intune/Microsoft Intune Agent.app/Contents/Resources/AppIcon.icns"
     fi
