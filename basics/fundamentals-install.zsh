@@ -22,23 +22,23 @@
 ########################################### Parameters to modify #########################################################
 
 		#check in the intake document if the customer would like to demote the current enduser to standard user (non admin).
-		#if so, change the following variable to true, otherwise set to false
-		demoteUser=false
+		#if so, change the following variable to 1, otherwise set to 0.
+		demoteUser=1
 
 		#check in the intake document if the customer would like to be possible to get admin rights for 30 min.
-		#if so, change to following variable to true, otherwise set to false
-		isAllowedToBecomeAdmin=true
+		#if so, change to following variable to 1, otherwise set to 0.
+		isAllowedToBecomeAdmin=1
 
 		#Type the labels you want to install on the endpoints. Double check the labels using the link in the following line.
 		#you can choose other apps for intel or arm (Apple Mx) architecture. ARM64 = Apple Mx.
 		#All the neccesary apps for the fundamentals install are already installed. 
 		#https://github.com/Installomator/Installomator/blob/main/Labels.txt
 		if [[ $(arch) == "arm64" ]]; then
-			#items=(microsoftautoupdate microsoftofficebusinesspro microsoftedge microsoftteamsnew microsoftonedrive microsoftdefender microsoftcompanyportal )
-			items=(microsoftautoupdate )
+			items=( microsoftofficebusinesspro microsoftedge microsoftonedrive microsoftdefender microsoftcompanyportal )
+			#items=(microsoftautoupdate )
 			# displaylinkmanager
 		else
-			items=(microsoftautoupdate microsoftofficebusinesspro microsoftedge microsoftteamsnew microsoftonedrive microsoftdefender microsoftcompanyportal)
+			items=( microsoftofficebusinesspro microsoftedge microsoftonedrive microsoftdefender microsoftcompanyportal)
 		fi
 
 		#Check in the intake document which items the customer wants to add to the dock. Standard Apple Items are being removed. 
@@ -136,19 +136,19 @@ main() {
 		items+=("desktoppr")
 		items+=("swiftdialog")
 		items+=("dialog")
+		((countlabels+=4))
 		#running depnotify asap
 		logging "configuring DEPNotify"
 		configDEP
 		logging "Starting DEPNotify"
 		startDEPNotify
-		logging "Items to install: ${items[*]}"
-		((countlabels+=4))
+		logging "Items (${#items[@]}) to install: ${items[*]}"
 		
 
 		logging "Running DEPNotify and installing all apps. Check /var/log/intune/Installomator-DEP.log"
 		runDEP
 		#if neccesary, install privileges app and it's helper-tool, adding to dock too.
-		if [ "$isAllowedToBecomeAdmin" = true ] ; then
+		if [ $isAllowedToBecomeAdmin -eq 1 ] ; then
 			installomatorInstall privileges
 			install-privileges-helper
 			dockitems+=("/Applications/Privileges.app")
@@ -156,7 +156,7 @@ main() {
 		logging "checking if wallpaper is already available."
 		checkAndSetWallpaper
 		logging "demoting user if configured"
-		demoteUserToStandard
+		demoteUserToStandard $demoteUser
 		logging "Customizing dock..."
 		createDock
 		endDEP
@@ -178,9 +178,10 @@ function createDock(){
 	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove FaceTime --no-restart
 	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Contacten --no-restart
 	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Notities --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Herrineringen --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove FreeForm --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Herinneringen --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Freeform --no-restart
 	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove TV --no-restart
+	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Agenda --no-restart
 	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Muziek --no-restart
 
 		for item in "${dockitems[@]}"; do
@@ -190,7 +191,7 @@ function createDock(){
 
 }
 function demoteUserToStandard () {
-	if [ "$demoteUser" = true]; then
+	if [ $demoteUser -eq 1 ]; then
 	currentAdminUser="$(stat -f "%Su" /dev/console)"
 		sudo dseditgroup -o edit -d "$currentAdminUser" -t user admin 
 		errcode=$? 
@@ -202,6 +203,7 @@ function demoteUserToStandard () {
 		depnotify_command "Status: Revoking admin rights for user $currentAdminUser"
 	else
 		logging "No demoting needed"
+		logging "Demoting was set to: $$demoteUser"
 	fi
 }
 function checkAndSetWallpaper  () {
