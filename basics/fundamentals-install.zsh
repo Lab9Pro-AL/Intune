@@ -50,7 +50,7 @@
 
 
 	#Installomator variables, here you can configure which labels need to be updated with auto updater. Alternativly copy paste from above.
-		interactiveMode="${4:="2"}"                             # Parameter 4: Interactive Mode [ 0 (Completely Silent) | 1 (Silent Discovery, Interactive Patching) | 2 (Full Interactive) (default) ]
+		interactiveMode="${4:="1"}"                             # Parameter 4: Interactive Mode [ 0 (Completely Silent) | 1 (Silent Discovery, Interactive Patching) | 2 (Full Interactive) (default) ]
 		ignoredLabels="${5:=""}"                                # Parameter 5: A space-separated list of Installomator labels to ignore (i.e., "microsoft* googlechrome* jamfconnect zoom* 1password* firefox* swiftdialog")
 		requiredLabels="${6:=""}"                               # Parameter 6: A space-separated list of required Installomator labels (i.e., "firefoxpkg_intl")
 		optionalLabels="${7:=""}"                               # Parameter 7: A space-separated list of optional Installomator labels (i.e., "renew") ** Does not support wildcards **
