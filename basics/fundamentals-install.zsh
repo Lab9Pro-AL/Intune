@@ -41,9 +41,13 @@
 			items=( microsoftofficebusinesspro microsoftedge microsoftonedrive microsoftdefender microsoftcompanyportal)
 		fi
 
+		#if the Dock needs to be changed, this should be 1. If the dock should stay as is, change it to 0.
+		#Most of the times this will be 1
+		changeDock=1
+
 		#Check in the intake document which items the customer wants to add to the dock. Standard Apple Items are being removed. 
 		#All Microsoft items should be contained. DO NOT FORGET THE .APP extension!!!!!!!!!!!!!!!!!!!!!!
-		dockitems=('/Applications/Microsoft Outlook.app' '/Applications/Microsoft Edge.app' '/Applications/Microsoft Teams.app' '/Applications/Microsoft Word.app' '/Applications/Microsoft Excel.app')
+		dockitems=('/Applications/Microsoft Outlook.app' '/Applications/Microsoft Edge.app' '/Applications/Microsoft Teams.app' '/Applications/Microsoft Word.app' '/Applications/Microsoft Excel.app' '/Applications/System Settings.app')
 		
 
 ########################################### Parameters to modify /end #########################################################
@@ -162,13 +166,36 @@ main() {
 		checkAndSetWallpaper
 		logging "demoting user if configured"
 		demoteUserToStandard $demoteUser
-		logging "Customizing dock..."
-		createDock
+		if [ $changeDock -eq 1 ] ; then
+			logging "Customizing dock..."
+			createDockV2
+		fi
 		endDEP
 		logging "All done for now"
 	
 	fi
 	caffexit 0
+}
+function createDockV2(){
+#This is a work-around function because dockutil wouldn't change the dock with Intune at ADE enrollment.
+#We copy the plist to tmp and edit it there. After this we copy it back to the original place and killing the dock which results in a new dock!
+
+	currentDockUser=$(echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ { print $3 }')
+    tmpDock=/var/tmp/dock.plist
+    originalDock="/Users/${currentDockUser}/Library/Preferences/com.apple.dock.plist"
+    cp $originalDock $tmpDock
+
+    /usr/local/bin/dockutil --remove all --no-restart $tmpDock
+    
+    for item in "${dockitems[@]}"; do
+			/usr/local/bin/dockutil -v --add $item --no-restart $tmpDock 
+	done
+
+    #chmod --reference=$originalDock $tmpDock 
+    cp -f $tmpDock $originalDock
+
+    killall -KILL Dock
+
 }
 function createDock(){
 	#getting latest index so we can restart dock
@@ -428,7 +455,7 @@ function startDEPNotify() {
     depnotify_command "Command: MainTitle: $title"
     depnotify_command "Command: Image: $LOGO_PATH"
     depnotify_command "Command: MainText: $message"
-    depnotify_command "Command: Determinate: $countLabels"
+	depnotify_command "Command: Determinate: ${#items[@]}"
 }
 
 # Notify the user using AppleScript
