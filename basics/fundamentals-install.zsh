@@ -35,9 +35,10 @@
 		#https://github.com/Installomator/Installomator/blob/main/Labels.txt
 		if [[ $(arch) == "arm64" ]]; then
 			items=( microsoftofficebusinesspro microsoftedge microsoftonedrive microsoftdefender microsoftcompanyportal )
-			#items=(microsoftautoupdate )
+			#items=(microsoftdefender )
 			# displaylinkmanager
 		else
+			#items=(microsoftdefender )
 			items=( microsoftofficebusinesspro microsoftedge microsoftonedrive microsoftdefender microsoftcompanyportal)
 		fi
 
@@ -45,12 +46,17 @@
 		#Most of the times this will be 1
 		changeDock=1
 
+		#Only if the variable above is set to 1, will the following variable have effect. If this is set to 1, all the existing dock items will be removed
+		#Check the intake document of the customer
+		removeAllDockItems=1
+
 		#Check in the intake document which items the customer wants to add to the dock. Standard Apple Items are being removed. 
 		#All Microsoft items should be contained. DO NOT FORGET THE .APP extension!!!!!!!!!!!!!!!!!!!!!!
 		dockitems=('/Applications/Microsoft Outlook.app' '/Applications/Microsoft Edge.app' '/Applications/Microsoft Teams.app' '/Applications/Microsoft Word.app' '/Applications/Microsoft Excel.app' '/Applications/System Settings.app')
 		
 
 ########################################### Parameters to modify /end #########################################################
+
 
 
 	#Installomator variables, here you can configure which labels need to be updated with auto updater. Alternativly copy paste from above.
@@ -185,7 +191,10 @@ function createDockV2(){
     originalDock="/Users/${currentDockUser}/Library/Preferences/com.apple.dock.plist"
     cp $originalDock $tmpDock
 
-    /usr/local/bin/dockutil --remove all --no-restart $tmpDock
+    if [ $removeAllDockItems -eq 1 ] ; then
+			logging "Removing all dock items..."
+			 /usr/local/bin/dockutil --remove all --no-restart $tmpDock
+	fi
     
     for item in "${dockitems[@]}"; do
 			/usr/local/bin/dockutil -v --add $item --no-restart $tmpDock 
