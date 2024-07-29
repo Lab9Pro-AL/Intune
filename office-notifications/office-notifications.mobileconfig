@@ -150,7 +150,7 @@
 					<true/>
 					<key>SoundsEnabled</key>
 					<true/>
-				</dict>				
+				</dict>
 				<dict>
 					<key>BadgesEnabled</key>
 					<true/>
@@ -313,15 +313,51 @@
 					<key>SoundsEnabled</key>
 					<true/>
 				</dict>
+				<dict>
+					<key>BadgesEnabled</key>
+					<true/>
+					<key>BundleIdentifier</key>
+					<string>au.csiro.dialog</string>
+					<key>CriticalAlertEnabled</key>
+					<false/>
+					<key>NotificationsEnabled</key>
+					<true/>
+					<key>ShowInCarPlay</key>
+					<true/>
+					<key>ShowInLockScreen</key>
+					<true/>
+					<key>ShowInNotificationCenter</key>
+					<true/>
+					<key>SoundsEnabled</key>
+					<true/>
+				</dict>
+				<dict>
+					<key>BadgesEnabled</key>
+					<true/>
+					<key>BundleIdentifier</key>
+					<string>au.bartreardon.dialog</string>
+					<key>CriticalAlertEnabled</key>
+					<false/>
+					<key>NotificationsEnabled</key>
+					<true/>
+					<key>ShowInCarPlay</key>
+					<true/>
+					<key>ShowInLockScreen</key>
+					<true/>
+					<key>ShowInNotificationCenter</key>
+					<true/>
+					<key>SoundsEnabled</key>
+					<true/>
+				</dict>
 			</array>
 			<key>PayloadDisplayName</key>
 			<string>Notifications</string>
 			<key>PayloadIdentifier</key>
-			<string>com.apple.notificationsettings</string>
+			<string>com.apple.notificationsettings.67612390-B071-4335-864F-580FC086D601</string>
 			<key>PayloadType</key>
 			<string>com.apple.notificationsettings</string>
 			<key>PayloadUUID</key>
-			<string>8FC45A38-886E-48B0-966F-05F15EEC8DD0</string>
+			<string>67612390-B071-4335-864F-580FC086D601</string>
 			<key>PayloadVersion</key>
 			<integer>1</integer>
 		</dict>
@@ -333,7 +369,7 @@
 	<key>PayloadType</key>
 	<string>Configuration</string>
 	<key>PayloadUUID</key>
-	<string>D6F21A2A-BD1B-4D2C-AF9E-54AA3874A1EE</string>
+	<string>F12EFDA2-BCCC-413A-AF39-B90004229035</string>
 	<key>PayloadVersion</key>
 	<integer>1</integer>
 </dict>
