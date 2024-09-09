@@ -9,10 +9,10 @@
 #                                                                                                           #
 #                                                                                                           #
 #                This script checks if the user has OneDrive configured.									#
-#                 If so and OneDrive isn't running, it will start it.                               		#
-#                  This version to use WITH MDM										                        #
+#                 If so and OneDrive isn't running, it will start it.										#
+#                  This version to use WITH MDM										 						#
 #																											#
-#                   Logs can be found in /var/log/onedrive-kickstart                                        #
+#                   Logs can be found in /var/log/onedrive-kickstart										#
 #                                                                                                           #
 #############################################################################################################
 # Tweaked from: https://github.com/soundsnw/mac-sysadmin-resources/blob/master/extension-attributes/onedrive-syncfailures.sh
