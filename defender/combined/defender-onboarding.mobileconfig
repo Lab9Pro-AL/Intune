@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- background service, netfilter, notifications, system extensions, accessibilty and all files-->
-<!-- ToDo: kext, bluetooth-->
-<!-- https://github.com/microsoft/mdatp-xplat/blob/master/macos/mobileconfig/profiles/background_services.mobileconfig-->
+<!-- background service, notifications, system extensions, accessibilty and all files-->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
@@ -121,14 +119,6 @@
 				<key>AllowUserOverrides</key>
 				<true/>
 				<key>AllowedSystemExtensions</key>
-				<dict>
-					<key>UBF8T346G9</key>
-					<array>
-						<string>com.microsoft.wdav.epsext</string>
-						<string>com.microsoft.wdav.netext</string>
-					</array>
-				</dict>
-				<key>NonRemovableSystemExtensions</key>
 				<dict>
 					<key>UBF8T346G9</key>
 					<array>
