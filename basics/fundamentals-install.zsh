@@ -104,6 +104,11 @@ mkdir $dir
 
 main() {
     #Main function of this script, this is where the magic happens
+    
+    #This part is to check if the device is ADE enrolled
+    isDEP="$(profiles status -type enrollment | grep 'DEP')"
+	if [[ $isDEP == *"Yes"* ]]; then
+	logging "is DEP enrollment. Let's GO.'"
 	until ps aux | grep /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock | grep -v grep &>/dev/null; do
 		delay=$(( $RANDOM % 50 + 10 ))
 		echo "$(date) |  + Dock not running, waiting [$delay] seconds"
@@ -180,7 +185,11 @@ main() {
 		logging "All done for now"
 	
 	fi
+	else
+		logging "No DEP enrollment. Skipping..."
+	fi
 	caffexit 0
+	
 }
 function createDockV2(){
 #This is a work-around function because dockutil wouldn't change the dock with Intune at ADE enrollment.
