@@ -169,7 +169,7 @@ main() {
 		runDEP
 		#if neccesary, install privileges app and it's helper-tool, adding to dock too.
 		if [ $isAllowedToBecomeAdmin -eq 1 ] ; then
-			installomatorInstall privileges
+			installomatorInstall privileges2
 			install-privileges-helper
 			dockitems+=("/Applications/Privileges.app")
 		fi
