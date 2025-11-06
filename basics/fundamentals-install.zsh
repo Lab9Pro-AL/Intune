@@ -1,4 +1,5 @@
 #!/bin/zsh
+#v1.5
 
 #############################################################################################################
 #                                      Created by Raf Vandelaer                                             #
@@ -18,12 +19,16 @@
 #                                                                                                           #
 #############################################################################################################
 
-
 ########################################### Parameters to modify #########################################################
+
+        #With this check, you enable debug mode which overrides the ADE check and the connection test (virtualbuddy issue)
+        # !! This is only to be used in test environments.
+        debugEnrollment=0
+
 
 		#check in the intake document if the customer would like to demote the current enduser to standard user (non admin).
 		#if so, change the following variable to 1, otherwise set to 0.
-		demoteUser=1
+		demoteUser=0
 
 		#check in the intake document if the customer would like to be possible to get admin rights for 30 min.
 		#if so, change to following variable to 1, otherwise set to 0.
@@ -52,465 +57,503 @@
 
 		#Check in the intake document which items the customer wants to add to the dock. Standard Apple Items are being removed. 
 		#All Microsoft items should be contained. DO NOT FORGET THE .APP extension!!!!!!!!!!!!!!!!!!!!!!
-		dockitems=('/Applications/Microsoft Outlook.app' '/Applications/Microsoft Edge.app' '/Applications/Microsoft Teams.app' '/Applications/Microsoft Word.app' '/Applications/Microsoft Excel.app' '/Applications/System Settings.app')
-		
+            dockitems=(
+                '/Applications/Microsoft Outlook.app'
+                '/Applications/Microsoft Edge.app'
+                '/Applications/Microsoft Teams.app'
+                '/Applications/Microsoft Word.app'
+                '/Applications/Microsoft Excel.app'
+                '/Applications/System Settings.app'
+                )
 
-########################################### Parameters to modify /end #########################################################
-
-
-
-	#Installomator variables, here you can configure which labels need to be updated with auto updater. Alternativly copy paste from above.
-		interactiveMode="${4:="1"}"                             # Parameter 4: Interactive Mode [ 0 (Completely Silent) | 1 (Silent Discovery, Interactive Patching) | 2 (Full Interactive) (default) ]
-		ignoredLabels="${5:=""}"                                # Parameter 5: A space-separated list of Installomator labels to ignore (i.e., "microsoft* googlechrome* jamfconnect zoom* 1password* firefox* swiftdialog")
-		requiredLabels="${6:=""}"                               # Parameter 6: A space-separated list of required Installomator labels (i.e., "firefoxpkg_intl")
-		optionalLabels="${7:=""}"                               # Parameter 7: A space-separated list of optional Installomator labels (i.e., "renew") ** Does not support wildcards **
-		#is overrun below
-		installomatorOptions="${8:-""}"                         # Parameter 8: A space-separated list of options to override default Installomator options (i.e., BLOCKING_PROCESS_ACTION=prompt_user NOTIFY=silent LOGO=appstore)
-		maxDeferrals="${9:-"3"}" 
+# Installomator auto-updater parameters (can be overridden by Intune script parameters 4..9)
+interactiveMode="${4:="1"}"
+ignoredLabels="${5:=""}"
+requiredLabels="${6:=""}"
+optionalLabels="${7:=""}"
+installomatorOptions="${8:-""}"
+maxDeferrals="${9:-"3"}"
 
 ##################################################################################################
 
-
-installomatorOptions="NOTIFY=silent BLOCKING_PROCESS_ACTION=ignore INSTALL=force IGNORE_APP_STORE_APPS=yes LOGGING=REQ"
-
-# DEPNotify display settings, change as desired
+# ===== SwiftDialog UI i.p.v. DEPNotify =====
 title="Installeren van apps"
-message="Gelieve even te wachten, de apps worden gedownload en geïnstalleerd. U kan het toestel in beperkte mate gebruiken."
+message="Gelieve even te wachten, de apps worden gedownload en geïnstalleerd..."
 endMessage="Installatie klaar! Custom aangevraagde apps worden later geïnstalleerd."
 errorMessage="Er was een probleem met de installatie van de apps. Gelieve IT te contacteren."
 
-
-
 # MARK: Variables
-instance="Lab9 Pro" # Name of used instance
-LOGO="microsoft"
-export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-scriptVersion="9.11"
-# Command-file to DEPNotify
-DEPNOTIFY_LOG="/var/tmp/depnotify.log"
-firstrun="/Users/Shared/Lab9Pro/firstrun"
-wallpaperIsSet="/Users/Shared/Lab9Pro/wallpaperIsSet"
+instance="Lab9 Pro"
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin
+scriptVersion="9.13-swiftdialog"
+
+# SwiftDialog command-file & binary
+DIALOG_CMD_FILE="/var/tmp/dialog-setup.log"
+DIALOG_BIN="/usr/local/bin/dialog"
+
+# Shared and helper
+sharedDir="/Users/Shared/Lab9Pro"
+helperDir="$sharedDir/auto-app-updater"
+wallpaper="$sharedDir/company-wallpaper.jpg"
+helperScriptName="/auto-app-updater.zsh"
+helperFullPath="${helperDir}${helperScriptName}"
+helperScriptURL="https://raw.githubusercontent.com/Lab9Pro-AL/Intune/main/auto-app-updater/auto-app-updater.zsh"
+
 # Counters
 errorCount=0
 countLabels=${#items[@]}
-#vars for our helper script
-dir="/Users/Shared/Lab9Pro/auto-app-updater"
-wallpaper="/Users/Shared/Lab9Pro/company-wallpaper.jpg"
-scriptname="/auto-app-updater.zsh"
-fullpath=$dir$scriptname
-scriptURL="https://raw.githubusercontent.com/Lab9Pro-AL/Intune/main/auto-app-updater/auto-app-updater.zsh"
 
-mkdir $dir
+# Logging
+logFolder="/var/log/intune"
+[[ -d $logFolder ]] || mkdir -p "$logFolder"
+chmod 755 "$logFolder"
+fixlog="$logFolder/intune-fundamentals-install.log"
+touch "$fixlog"
+readonly fixlog
+log_location="$logFolder/Installomator-Dialog.log"
+label="1st-v$scriptVersion"
 
-main() {
-    #Main function of this script, this is where the magic happens
-    
-    #This part is to check if the device is ADE enrolled
-    isDEP="$(profiles status -type enrollment | grep 'DEP')"
-	if [[ $isDEP == *"Yes"* ]]; then
-	logging "is DEP enrollment. Let's GO."
-	until ps aux | grep /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock | grep -v grep &>/dev/null; do
-		delay=$(( $RANDOM % 50 + 10 ))
-		echo "$(date) |  + Dock not running, waiting [$delay] seconds"
-		sleep $delay
-	done
-	logging "Dock is here, lets carry on"
-	#checking if first run, if so we deploy all software and run DEPnotify
-	# Installs the latest release of Installomator from Github
-    if [ -f $firstrun ]; then
-		#if not firstrun, updating software. 
-		#checking if file exists
-		logging "Not first run so we need to run auto-updater. Check autopatch-lab9pro.log for more info"
-		if [ -f "$dir/auto-app-updater.md5" ]; then
-			#checking old and new MD5 of file
-			storedMD5=$(<"$dir/auto-app-updater.md5")
-			newMD5=$(curl -sL $scriptURL | md5)
-			if [[ "$storedMD5" == "$newMD5" ]]; then
-				logging "Same file on server, not downloading..."
-				#if md5 are the same, no need to download again.
-				#Execute the script
-				$fullpath null null null $interactiveMode $ignoredLabels $requiredLabels $optionalLabels $installomatorOptions $maxDeferrals
-			else
-				#other md5 -> need to download newer script and change the stored MD5
-				logging "Other version of auto-patch, let's go."
-				downloadAndRunAutoAppUpdater
-			fi
-		
-		else 
-			#if  no md5 available -> creating for future checks, downloading and running script
-		downloadAndRunAutoAppUpdater
-		fi
-		#checking if wallpaper is previously set, if not... checking if file is available and if so, setting.
-		checkAndSetWallpaper
+# Installomator global options (sane defaults)
+installomatorOptions="NOTIFY=silent BLOCKING_PROCESS_ACTION=ignore INSTALL=force IGNORE_APP_STORE_APPS=yes LOGGING=REQ"
 
-	#if first run, we need to install all the software first and run the DEPNotify	
-	else 
-		logging "This is first run... Installing all apps and running DEPNotify."
-		
-		touch $firstrun
-		#installing basic needs so we can show user the progress
-        downloadAndInstallInstallomator
-		installomatorInstall depnotify
-		#adding items to list to install
-		items+=("dockutil")
-		items+=("desktoppr")
-		items+=("swiftdialog")
-		items+=("dialog")
-		((countlabels+=4))
-		#running depnotify asap
-		logging "configuring DEPNotify"
-		configDEP
-		logging "Starting DEPNotify"
-		startDEPNotify
-		logging "Items (${#items[@]}) to install: ${items[*]}"
-		
+# Ensure dirs
+mkdir -p "$sharedDir" "$helperDir"
 
-		logging "Running DEPNotify and installing all apps. Check /var/log/intune/Installomator-DEP.log"
-		runDEP
-		#if neccesary, install privileges app and it's helper-tool, adding to dock too.
-		if [ $isAllowedToBecomeAdmin -eq 1 ] ; then
-			installomatorInstall privileges2
-			install-privileges-helper
-			dockitems+=("/Applications/Privileges.app")
-		fi
-		logging "checking if wallpaper is already available."
-		checkAndSetWallpaper
-		logging "demoting user if configured"
-		demoteUserToStandard $demoteUser
-		if [ $changeDock -eq 1 ] ; then
-			logging "Customizing dock..."
-			createDockV2
-		fi
-		endDEP
-		logging "All done for now"
-	
-	fi
-	else
-		logging "No DEP enrollment. Skipping..."
-	fi
-	caffexit 0
-	
+#################################### Notifications profile for SwiftDialog #######################
+# Installeert automatisch een meldingen-profiel zodat SwiftDialog banners/sound/badges mag tonen.
+ensure_swiftdialog_notifications_profile() {
+    local profile_id="be.etest.notifications.swiftdialog"
+    local tmp_profile="/var/tmp/${profile_id}.mobileconfig"
+
+    if profiles list -type configuration 2>/dev/null | grep -q "$profile_id"; then
+        printlog "SwiftDialog notifications profile already present ($profile_id)."
+        return 0
+    fi
+
+    cat > "$tmp_profile" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>PayloadType</key>
+      <string>com.apple.notificationsettings</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+      <key>PayloadIdentifier</key>
+      <string>be.test.notifications.swiftdialog.payload</string>
+      <key>PayloadUUID</key>
+      <string>3E4A6F9C-8C7A-4D3E-9E3B-9C8C3A7A1B21</string>
+      <key>PayloadDisplayName</key>
+      <string>SwiftDialog Notifications</string>
+      <key>NotificationSettings</key>
+      <array>
+        <dict>
+          <key>BundleIdentifier</key>
+          <string>au.csiro.SwiftDialog</string>
+          <key>Enabled</key>
+          <true/>
+          <key>AlertType</key>
+          <integer>2</integer> <!-- 1=none, 2=banners, 3=alerts -->
+          <key>ShowInNotificationCenter</key>
+          <true/>
+          <key>ShowInLockScreen</key>
+          <true/>
+          <key>BadgeEnabled</key>
+          <true/>
+          <key>SoundEnabled</key>
+          <true/>
+          <key>CriticalAlertEnabled</key>
+          <false/>
+          <key>GroupingType</key>
+          <integer>0</integer> <!-- 0=automatic -->
+        </dict>
+      </array>
+    </dict>
+  </array>
+  <key>PayloadDisplayName</key>
+  <string>SwiftDialog - Notifications</string>
+  <key>PayloadIdentifier</key>
+  <string>be.test.notifications.swiftdialog</string>
+  <key>PayloadOrganization</key>
+  <string>Test</string>
+  <key>PayloadRemovalDisallowed</key>
+  <false/>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadUUID</key>
+  <string>F5E2C9AB-7A41-47E6-9D7E-6A3D9C1F4B55</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+</dict>
+</plist>
+EOF
+
+    printlog "Installing SwiftDialog notifications profile..."
+    /usr/bin/profiles -I -F "$tmp_profile" 2>&1 | tee -a "$log_location"
+    local rc=$?
+    if [[ $rc -ne 0 ]]; then
+        printlog "Failed to install SwiftDialog notifications profile (rc=$rc). Continuing without."
+    else
+        printlog "SwiftDialog notifications profile installed."
+    fi
+    rm -f "$tmp_profile" 2>/dev/null || true
 }
-function createDockV2(){
-#This is a work-around function because dockutil wouldn't change the dock with Intune at ADE enrollment.
-#We copy the plist to tmp and edit it there. After this we copy it back to the original place and killing the dock which results in a new dock!
 
-	currentDockUser=$(echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ { print $3 }')
+############################################### Main #############################################
+main() {
+    logging "Starting main execution..."
+
+    # Wacht tot er een actieve gebruikerssessie is (Dock is teken van login)
+    until ps aux | grep -q "[D]ock.app/Contents/MacOS/Dock"; do
+        delay=$((RANDOM % 10 + 5))
+        logging "Dock not running yet, waiting ${delay}s..."
+        sleep $delay
+    done
+
+    # Detecteer echte console user (geen root of _mbsetupuser)
+    currentUser="$(stat -f '%Su' /dev/console)"
+    while [[ "$currentUser" == "root" || "$currentUser" == "_mbsetupuser" || -z "$currentUser" ]]; do
+        logging "Waiting for real user session (currentUser=$currentUser)..."
+        sleep 2
+        currentUser="$(stat -f '%Su' /dev/console)"
+    done
+
+    userHome="$(dscl . -read /Users/"$currentUser" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+    [[ -z "$userHome" ]] && userHome="/Users/$currentUser"
+
+    logging "Active console user detected: $currentUser ($userHome)"
+
+    # Paden instellen
+    userLab9Dir="$userHome/Lab9Pro"
+    firstrunUser="$userLab9Dir/firstrun"
+    sharedFirstrun="/Users/Shared/Lab9Pro/firstrun"
+
+    mkdir -p "$userLab9Dir"
+    chown "$currentUser":staff "$userLab9Dir" 2>/dev/null || true
+
+    # === LEGACY → USER MIGRATIE VAN 'firstrun' ===
+    if [[ -f "$sharedFirstrun" ]]; then
+        if [[ ! -f "$firstrunUser" ]]; then
+            logging "Legacy firstrun gevonden in Shared. Migreren naar $firstrunUser..."
+            /usr/bin/install -p "$sharedFirstrun" "$firstrunUser" 2>/dev/null || cp -p "$sharedFirstrun" "$firstrunUser"
+            chmod 644 "$firstrunUser" 2>/dev/null || true
+            chown "$currentUser":staff "$firstrunUser" 2>/dev/null || true
+        else
+            logging "Zowel legacy als user firstrun aanwezig; user-variant behoudt de waarheid."
+        fi
+        rm -f "$sharedFirstrun" 2>/dev/null || true
+    fi
+
+    # ==== Vanaf hier enkel nog met $firstrunUser werken ====
+    logging "Using firstrun marker at: $firstrunUser"
+
+    # ADE check + tijdelijke bypass (debugEnrollment)
+    isDEP="$(profiles status -type enrollment | grep 'DEP')"
+    if [[ $isDEP == *"Yes"* || $debugEnrollment == 1 ]]; then
+        logging "Proceeding (DEP check passed of debugEnrollment actief)."
+        logging "Dock is actief, carry on..."
+
+        if [[ -f "$firstrunUser" ]]; then
+            logging "Not first run (firstrun marker bestaat) -> auto-updater only."
+            runAutoUpdater
+            checkAndSetWallpaper
+        else
+            logging "First run... Installing all apps and running SwiftDialog."
+            : > "$firstrunUser"
+            chown "$currentUser":staff "$firstrunUser" 2>/dev/null || true
+            chmod 644 "$firstrunUser" 2>/dev/null || true
+
+            downloadAndInstallInstallomator
+
+            # Tools die we nodig hebben
+            items+=("dockutil" "desktoppr" "swiftdialog")
+            ((countLabels+=3))
+
+            installomatorInstall swiftdialog
+            ensure_swiftdialog_notifications_profile
+
+            configDialog
+            startDialog
+            logging "Items (${#items[@]}) to install: ${items[*]}"
+            runDialogInstallations
+
+            if [[ $isAllowedToBecomeAdmin -eq 1 ]]; then
+                installomatorInstall privileges2
+                install-privileges-helper2
+                dockitems+=("/Applications/Privileges.app")
+            fi
+
+            checkAndSetWallpaper
+            demoteUserToStandard $demoteUser
+
+            if [[ $changeDock -eq 1 ]]; then
+                logging "Customizing dock..."
+                createDockV2
+            fi
+
+            endDialog
+            logging "All done for now."
+        fi
+    else
+        logging "No DEP enrollment. Skipping..."
+    fi
+
+    caffexit 0
+}
+
+
+
+############################################### Dock ###############################################
+createDockV2(){
+    currentDockUser=$(echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ { print $3 }')
     tmpDock=/var/tmp/dock.plist
     originalDock="/Users/${currentDockUser}/Library/Preferences/com.apple.dock.plist"
-    cp $originalDock $tmpDock
+    cp "$originalDock" "$tmpDock" 2>/dev/null
 
-    if [ $removeAllDockItems -eq 1 ] ; then
-			logging "Removing all dock items..."
-			 /usr/local/bin/dockutil --remove all --no-restart $tmpDock
-	fi
-    
+    if [[ $removeAllDockItems -eq 1 ]] ; then
+        logging "Removing all dock items..."
+        /usr/local/bin/dockutil --remove all --no-restart "$tmpDock"
+    fi
+
     for item in "${dockitems[@]}"; do
-			/usr/local/bin/dockutil -v --add $item --no-restart $tmpDock 
-	done
+        /usr/local/bin/dockutil -v --add "$item" --no-restart "$tmpDock"
+    done
 
-    #chmod --reference=$originalDock $tmpDock 
-    cp -f $tmpDock $originalDock
-
-    killall -KILL Dock
-
-}
-function createDock(){
-	#getting latest index so we can restart dock
-	depnotify_command "Status: Configuring dock"
-
-	#removing items
-	currentDesktopUser=$( echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ { print $3 }' )
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Berichten --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Mail --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove "Foto's" --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Kaarten --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove FaceTime --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Contacten --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Notities --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Herinneringen --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Freeform --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove TV --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Agenda --no-restart
-	sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --remove Muziek --no-restart
-
-		for item in "${dockitems[@]}"; do
-			sudo -u "$currentDesktopUser" /usr/local/bin/dockutil --add $item --no-restart
-		done
-	killall -KILL Dock
-
-}
-function demoteUserToStandard () {
-	if [ $demoteUser -eq 1 ]; then
-	currentAdminUser="$(stat -f "%Su" /dev/console)"
-		sudo dseditgroup -o edit -d "$currentAdminUser" -t user admin 
-		errcode=$? 
-			if [ "$errcode" -ne 0 ]; 
-				then 
-				logging "couldn't demote user to standard..."
-			fi 
-		logging "Admin rights revoked for user $currentAdminUser"
-		depnotify_command "Status: Revoking admin rights for user $currentAdminUser"
-	else
-		logging "No demoting needed"
-		logging "Demoting was set to: $$demoteUser"
-	fi
-}
-function checkAndSetWallpaper  () {
-	currentDesktopUser=$( echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ { print $3 }' )
-	#checking if wallpaper was already set
-	if [[ ! -f $wallpaperIsSet ]]; then
-		#if not set, setting once, if file is available
-		if [[ -f $wallpaper ]]; then
-
-			$wallpaper | md5 > $wallpaperIsSet
-			logging "wallpaper available and not yet configured, configuring..."
-			sudo -u "$currentDesktopUser" /usr/local/bin/desktoppr $wallpaper
-			depnotify_command "Status: Setting wallpaper"
-		else
-			logging "wallpaper not yet available or never configured"
-		fi
-	#if already set, checking if wallpaper is newer.
-	else
-		logging "wallpaper was already set, checking if file is newer"
-		storedMD5=$(<"$wallpaperIsSet")
-		newMD5=$($wallpaper | md5)
-		if [[ "$storedMD5" = "$newMD5" ]]; then
-			logging "wallpaper is the same, not changing"
-		else
-			sudo -u "$currentDesktopUser" /usr/local/bin/desktoppr $wallpaper
-		fi
-	fi
-	
-}
-function downloadAndRunAutoAppUpdater () {
-    echo "Downloading new file and executing."
-     curl -sL $scriptURL | md5 > $dir/auto-app-updater.md5
-    # Download the script from the given URL
-     curl -o $fullpath $scriptURL 
-    # Make the script executable
-     chmod +x $fullpath
-    #Execute the script
-      $fullpath null null null $interactiveMode $ignoredLabels $requiredLabels $optionalLabels $installomatorOptions $maxDeferrals
-
+    cp -f "$tmpDock" "$originalDock" 2>/dev/null
+    killall -KILL Dock 2>/dev/null
 }
 
-#logging
+############################################### User demote ########################################
+demoteUserToStandard () {
+    if [[ $demoteUser -eq 1 ]]; then
+        currentAdminUser="$(stat -f "%Su" /dev/console)"
+        dseditgroup -o edit -d "$currentAdminUser" -t user admin
+        errcode=$?
+        if [[ "$errcode" -ne 0 ]]; then
+            logging "couldn't demote user to standard..."
+        else
+            logging "Admin rights revoked for user $currentAdminUser"
+            dialog_command "progresstext: Adminrechten intrekken voor gebruiker $currentAdminUser"
+        fi
+    else
+        logging "No demoting needed (demoteUser=$demoteUser)"
+    fi
+}
+
+############################################### Wallpaper #########################################
+wallpaperIsSet="/Users/Shared/Lab9Pro/wallpaperIsSet"
+checkAndSetWallpaper() {
+    currentDesktopUser=$( echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ { print $3 }' )
+    if [[ ! -f $wallpaperIsSet ]]; then
+        if [[ -f $wallpaper ]]; then
+            md5 -q "$wallpaper" > "$wallpaperIsSet"
+            logging "Setting wallpaper (first time)..."
+            sudo -u "$currentDesktopUser" /usr/local/bin/desktoppr "$wallpaper"
+            dialog_command "progresstext: Achtergrond instellen"
+        else
+            logging "Wallpaper not available yet."
+        fi
+    else
+        logging "Wallpaper already set, checking if newer..."
+        storedMD5=$(<"$wallpaperIsSet")
+        newMD5=$(md5 -q "$wallpaper" 2>/dev/null || echo "")
+        if [[ -n "$newMD5" && "$storedMD5" != "$newMD5" ]]; then
+            sudo -u "$currentDesktopUser" /usr/local/bin/desktoppr "$wallpaper"
+            md5 -q "$wallpaper" > "$wallpaperIsSet"
+            logging "Wallpaper updated."
+        else
+            logging "Wallpaper unchanged."
+        fi
+    fi
+}
+
+############################################### Auto-updater ######################################
+runAutoUpdater () {
+    if [[ -f "$helperDir/auto-app-updater.md5" ]]; then
+        storedMD5=$(<"$helperDir/auto-app-updater.md5")
+        newMD5=$(curl -sL "$helperScriptURL" | md5)
+        if [[ "$storedMD5" == "$newMD5" ]]; then
+            logging "Same auto-updater on server, not downloading."
+            "$helperFullPath" null null null $interactiveMode $ignoredLabels $requiredLabels $optionalLabels $installomatorOptions $maxDeferrals
+        else
+            logging "Newer auto-updater found, downloading."
+            downloadAndRunAutoAppUpdater
+        fi
+    else
+        downloadAndRunAutoAppUpdater
+    fi
+}
+
+downloadAndRunAutoAppUpdater () {
+    echo "Downloading new auto-updater and executing."
+    curl -sL "$helperScriptURL" | md5 > "$helperDir/auto-app-updater.md5"
+    curl -sfLo "$helperFullPath" "$helperScriptURL"
+    chmod +x "$helperFullPath"
+    "$helperFullPath" null null null $interactiveMode $ignoredLabels $requiredLabels $optionalLabels $installomatorOptions $maxDeferrals
+}
+
+############################################### Logging utils #####################################
 logging () {
     fixdate="$(date +%d%m%Y-%H:%M)"
-	echo $fixdate": " $1 | tee -a "$fixlog"
+    echo "$fixdate: $1" | tee -a "$fixlog"
 }
 printlog(){
     timestamp=$(date +%F\ %T)
     if [[ "$(whoami)" == "root" ]]; then
-        echo "$timestamp :: $label : $1" | tee -a $log_location
+        echo "$timestamp :: $label : $1" | tee -a "$log_location"
     else
         echo "$timestamp :: $label : $1"
     fi
 }
+
+############################################### Installomator wrap ###############################
 installomatorInstall(){
     appToInstall=$1
-   logging "Installing "$appToInstall
-    /usr/local/Installomator/Installomator.sh $appToInstall
-}
-addtoDock (){
-     logging "adding "$1" to the dock"
-    /usr/local/bin/dockutil --add $1
-}
-configDEP(){
-	# MARK: Constants, logging and caffeinate
-		log_message="$instance: Installomator 1st with DEPNotify, v$scriptVersion"
-		label="1st-v$scriptVersion"
-
-		log_location=$logFolder"/Installomator-DEP.log"
-
-		printlog "[LOG-BEGIN] ${log_message}"
-
-		# Internet check
-		if [[ "$(nc -z -v -G 10 1.1.1.1 53 2>&1 | grep -io "succeeded")" != "succeeded" ]]; then
-			printlog "ERROR. No internet connection, we cannot continue."
-			exit 90
-		fi
-
-		# No sleeping
-		/usr/bin/caffeinate -d -i -m -u &
-		caffeinatepid=$!
-		printlog "Total installations: $countLabels"
-
-		# Microsoft Endpoint Manager (Intune)
-        LOGO_PATH="/Library/Intune/Microsoft Intune Agent.app/Contents/Resources/AppIcon.icns"
-		if [[ ! -a "${LOGO_PATH}" ]]; then
-			printlog "ERROR in LOGO_PATH '${LOGO_PATH}', setting Mac App Store."
-			if [[ $(/usr/bin/sw_vers -buildVersion) > "19" ]]; then
-				LOGO_PATH="/System/Applications/App Store.app/Contents/Resources/AppIcon.icns"
-			else
-				LOGO_PATH="/Applications/App Store.app/Contents/Resources/AppIcon.icns"
-			fi
-		fi
-		printlog "LOGO: $LOGO - LOGO_PATH: $LOGO_PATH"
-		# MARK: Functions
-		printlog "depnotify_command function"
-		echo "" > $DEPNOTIFY_LOG || true
-
-		depnotify_command "Command: MainTitle: $title"
-    	depnotify_command "Command: Image: $LOGO_PATH"
-		depnotify_command "Status: Controle van toestel, even geduld."
-
-		# MARK: Install DEPNotify
-		cmdOutput="$( ${destFile} depnotify LOGO=$LOGO NOTIFY=silent BLOCKING_PROCESS_ACTION=ignore LOGGING=WARN || true )"
-		exitStatus="$( echo "${cmdOutput}" | grep --binary-files=text -i "exit" | tail -1 | sed -E 's/.*exit code ([0-9]).*/\1/g' || true )"
-		printlog "DEPNotify install result: $exitStatus"
-}
-runDEP(){
-			# Check before running
-		echo "LOGO: $LOGO"
-		if [[ -z $LOGO ]]; then
-			echo "ERROR: LOGO variable empty. Fatal problem. Exiting."
-			exit 1
-		fi
-		case $LOGO in
-			addigy|microsoft)
-				conditionFile="/var/db/.Installomator1stDone"
-				# Addigy and Microsoft Endpoint Manager (Intune) need a check for a touched file
-				if [ -e "$conditionFile" ]; then
-					echo "$conditionFile exists, so we exit."
-					exit 0
-				else
-					echo "$conditionFile not found, so we continue…"
-				fi
-				;;
-		esac
-
-		
-
-		# MARK: Installations with DEPNotify
-		itemName=""
-		errorLabels=""
-		((countLabels++))
-		((countLabels--))
-		printlog "$countLabels labels to install"
-
-		#aangepast Raf 12/07
-		#startDEPNotify
-
-		for item in "${items[@]}"; do
-			# Check if DEPNotify is running and try open it if not
-			if ! pgrep -xq "DEPNotify"; then
-				startDEPNotify
-			fi
-			itemName=$( ${destFile} ${item} RETURN_LABEL_NAME=1 LOGGING=REQ INSTALL=force | tail -1 || true )
-			if [[ "$itemName" != "#" ]]; then
-				depnotify_command "Status: Installeren van $itemName…"
-			else
-				depnotify_command "Status: Installeren van $item…"
-			fi
-			printlog "$item $itemName"
-			cmdOutput="$( ${destFile} ${item} LOGO=$LOGO ${installomatorOptions} || true )"
-			#cmdOutput="2022-05-19 13:20:45 : REQ   : installomator : ################## End Installomator, exit code 0"
-			exitStatus="$( echo "${cmdOutput}" | grep --binary-files=text -i "exit" | tail -1 | sed -E 's/.*exit code ([0-9]).*/\1/g' || true )"
-			if [[ ${exitStatus} -eq 0 ]] ; then
-				printlog "${item} succesfully installed."
-				warnOutput="$( echo "${cmdOutput}" | grep --binary-files=text "WARN" || true )"
-				printlog "$warnOutput"
-			else
-				printlog "Error installing ${item}. Exit code ${exitStatus}"
-				#printlog "$cmdOutput"
-				errorOutput="$( echo "${cmdOutput}" | grep --binary-files=text -i "error" || true )"
-				printlog "$errorOutput"
-				((errorCount++))
-				errorLabels="$errorLabels ${item}"
-			fi
-			((countLabels--))
-			itemName=""
-		done
-	
-
-}
-endDEP(){
-	# Prevent re-run of script if conditionFile is set
-	#OLD condition file is replaced with own
-		# if [[ ! -z "$conditionFile" ]]; then
-		# 	printlog "Touching condition file so script will not run again"
-		# 	touch "$conditionFile" || true
-		# 	printlog "$(ls -al "$conditionFile" || true)"
-		# fi
-
-		# Show error to user if any
-		printlog "Errors: $errorCount"
-		if [[ $errorCount -ne 0 ]]; then
-			errorMessage="${errorMessage} Total errors: $errorCount"
-			message="$errorMessage"
-			displayDialog &
-			endMessage="$message"
-			printlog "errorLabels: $errorLabels"
-		fi
-
-		depnotify_command "Command: MainText: $endMessage"
-		depnotify_command "Command: Quit: $endMessage"
-
-		sleep 1
-		printlog "Remove $(rm -fv $DEPNOTIFY_LOG || true)"
-
-		printlog "Ending"
-		
-}
-caffexit () {
-    kill "$caffeinatepid" || true
-    printlog "[LOG-END] Status $1"
-    exit $1
-}
-function depnotify_command(){
-    printlog "DEPNotify-command: $1"
-    echo "$1" >> $DEPNOTIFY_LOG || true
+    logging "Installing $appToInstall"
+    /usr/local/Installomator/Installomator.sh "$appToInstall"
 }
 
-function startDEPNotify() {
-    currentUser="$(stat -f "%Su" /dev/console)"
-    currentUserID=$(id -u "$currentUser")
-    launchctl asuser $currentUserID open -a "/Applications/Utilities/DEPNotify.app/Contents/MacOS/DEPNotify" --args -path "$DEPNOTIFY_LOG" || true # --args -fullScreen
-    sleep 1
-    depnotify_command "Command: KillCommandFile:"
-    depnotify_command "Command: MainTitle: $title"
-    depnotify_command "Command: Image: $LOGO_PATH"
-    depnotify_command "Command: MainText: $message"
-	depnotify_command "Command: Determinate: ${#items[@]}"
-}
+############################################### SwiftDialog (vervanger DEPNotify) ################
+configDialog(){
+    log_message="$instance: Installomator 1st with SwiftDialog, v$scriptVersion"
+    printlog "[LOG-BEGIN] ${log_message}"
 
-# Notify the user using AppleScript
-function displayDialog(){
-    currentUser="$(stat -f "%Su" /dev/console)"
-    currentUserID=$(id -u "$currentUser")
-    if [[ "$currentUser" != "" ]]; then
-        launchctl asuser $currentUserID sudo -u $currentUser osascript -e "button returned of (display dialog \"$message\" buttons {\"OK\"} default button \"OK\" with icon POSIX file \"$LOGO_PATH\")" || true
+    if [[ "$debugEnrollment" != "1" ]]; then
+        if [[ "$(nc -z -v -G 10 1.1.1.1 53 2>&1 | grep -io "succeeded")" != "succeeded" ]]; then
+            printlog "ERROR. No internet connection, we cannot continue."
+            exit 90
+        fi
+    else
+        printlog "DEBUG: Internet check skipped (debug enrollment)."
     fi
+
+
+    # Caffeinate
+    /usr/bin/caffeinate -d -i -m -u &
+    caffeinatepid=$!
+    printlog "Total installations: $countLabels"
+
+    # Logo (fallback: App Store)
+    LOGO_PATH="/Library/Intune/Microsoft Intune Agent.app/Contents/Resources/AppIcon.icns"
+    if [[ ! -a "${LOGO_PATH}" ]]; then
+        if [[ $(/usr/bin/sw_vers -buildVersion) > "19" ]]; then
+            LOGO_PATH="/System/Applications/App Store.app/Contents/Resources/AppIcon.icns"
+        else
+            LOGO_PATH="/Applications/App Store.app/Contents/Resources/AppIcon.icns"
+        fi
+    fi
+    printlog "LOGO_PATH: $LOGO_PATH"
+
+    # Maak leeg commandfile
+    : > "$DIALOG_CMD_FILE" || true
 }
 
+startDialog() {
+    currentUser="$(stat -f "%Su" /dev/console)"
+    currentUserID=$(id -u "$currentUser")
+
+    # Fallback indien binary niet in vaste pad
+    if [[ ! -x "$DIALOG_BIN" ]]; then
+        DIALOG_BIN="$(command -v dialog)"
+    fi
+
+    # Let op: elke regel met '\' moet eindigen op '\'
+    # Commentaar op een aparte regel zetten!
+    launchctl asuser "$currentUserID" "$DIALOG_BIN" \
+        --title "$title" \
+        --message "$message" \
+        --icon "$LOGO_PATH" \
+        --progress \
+        --infotext "Logs: $logFolder" \
+        --button1text "OK" \
+        --button1disabled \
+        --commandfile "$DIALOG_CMD_FILE" &
+    
+    sleep 1
+    dialog_command "progress: 0"
+    dialog_command "progresstext: Voorbereiden…"
+}
+
+
+
+dialog_command() {
+    printlog "Dialog-command: $1"
+    echo "$1" >> "$DIALOG_CMD_FILE"
+}
+
+runDialogInstallations(){
+    if [[ -z "$LOGO_PATH" ]]; then
+        echo "ERROR: LOGO_PATH empty. Exiting."
+        exit 1
+    fi
+
+    local total=${#items[@]}
+    local doneCount=0
+    dialog_command "progress: 0"
+    dialog_command "progresstext: Voorbereiden…"
+
+    for item in "${items[@]}"; do
+        itemName=$(/usr/local/Installomator/Installomator.sh "${item}" RETURN_LABEL_NAME=1 LOGGING=REQ INSTALL=force | tail -1)
+        [[ "$itemName" == "#" || -z "$itemName" ]] && itemName="$item"
+
+        dialog_command "progresstext: Installeren van ${itemName}…"
+        printlog "Installing $item ($itemName)"
+
+        cmdOutput="$( /usr/local/Installomator/Installomator.sh "${item}" ${installomatorOptions} || true )"
+        exitStatus="$( echo "${cmdOutput}" | grep --binary-files=text -i "exit" | tail -1 | sed -E 's/.*exit code ([0-9]).*/\1/g' || true )"
+
+        if [[ ${exitStatus} -eq 0 ]] ; then
+            printlog "${item} succesfully installed."
+            warnOutput="$( echo "${cmdOutput}" | grep --binary-files=text "WARN" || true )"
+            [[ -n "$warnOutput" ]] && printlog "$warnOutput"
+        else
+            printlog "Error installing ${item}. Exit code ${exitStatus}"
+            errorOutput="$( echo "${cmdOutput}" | grep --binary-files=text -i "error" || true )"
+            [[ -n "$errorOutput" ]] && printlog "$errorOutput"
+            ((errorCount++))
+            errorLabels="$errorLabels ${item}"
+        fi
+
+        ((doneCount++))
+        local pct=$(( (doneCount * 100) / total ))
+        dialog_command "progress: $pct"
+    done
+}
+
+endDialog(){
+    # zet progress visueel op 100% en tekst op 'Klaar'
+    dialog_command "progress: 100"
+    dialog_command "progresstext: Klaar"
+    dialog_command "button1: enable"          # <- OK wordt blauw/klikbaar
+
+    printlog "Errors: $errorCount"
+    if [[ $errorCount -ne 0 ]]; then
+        finalMsg="${errorMessage} Total errors: $errorCount"
+        dialog_command "title: Installatie met waarschuwingen"
+        dialog_command "message: $finalMsg"
+        dialog_command "button1text: OK"
+    else
+        dialog_command "title: Klaar"
+        dialog_command "message: $endMessage"
+        dialog_command "button1text: OK"
+    fi
+    printlog "Ending"
+}
+
+
+############################################### Privileges helper ###############################
 install-privileges-helper(){
-#https://travellingtechguy.blog/sap-privileges-app/
-
-        exitCode=0
-
-        helperPath="/Applications/Privileges.app/Contents/XPCServices/PrivilegesXPC.xpc/Contents/Library/LaunchServices/corp.sap.privileges.helper"
-
-        if [[ -f "$helperPath" ]]; then
-
-            # create the target directory if needed
-            if [[ ! -d "/Library/PrivilegedHelperTools" ]]; then
-                /bin/mkdir -p "/Library/PrivilegedHelperTools"
-                /bin/chmod 755 "/Library/PrivilegedHelperTools"
-                /usr/sbin/chown -R root:wheel "/Library/PrivilegedHelperTools"
-            fi
-            
-            # move the privileged helper into place
-            /bin/cp -f "$helperPath" "/Library/PrivilegedHelperTools"
-            
-            if [[ $? -eq 0 ]]; then
-                /bin/chmod 755 "/Library/PrivilegedHelperTools/corp.sap.privileges.helper"
-
-                # create the launchd plist
-                helperPlistPath="/Library/LaunchDaemons/corp.sap.privileges.helper.plist"
-            
-                /bin/cat > "$helperPlistPath" << EOF
+    helperPath="/Applications/Privileges.app/Contents/XPCServices/PrivilegesXPC.xpc/Contents/Library/LaunchServices/corp.sap.privileges.helper"
+    if [[ -f "$helperPath" ]]; then
+        [[ -d "/Library/PrivilegedHelperTools" ]] || { mkdir -p "/Library/PrivilegedHelperTools"; chmod 755 "/Library/PrivilegedHelperTools"; chown -R root:wheel "/Library/PrivilegedHelperTools"; }
+        cp -f "$helperPath" "/Library/PrivilegedHelperTools"
+        if [[ $? -eq 0 ]]; then
+            chmod 755 "/Library/PrivilegedHelperTools/corp.sap.privileges.helper"
+            helperPlistPath="/Library/LaunchDaemons/corp.sap.privileges.helper.plist"
+            cat > "$helperPlistPath" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -529,147 +572,118 @@ install-privileges-helper(){
 </dict>
 </plist>
 EOF
-
-                /bin/chmod 644 "$helperPlistPath"
-                
-                # load the launchd plist only if installing on the boot volume
-                    /bin/launchctl bootstrap system "$helperPlistPath"
-                
-                # restart the Dock if Privileges is in there. This ensures proper loading
-                # of the (updated) Dock tile plug-in
-                
-                # get the currently logged-in user and go ahead if it's not root
-                currentUser=$(/bin/ls -l /dev/console | /usr/bin/awk '{ print  }')
-
-                if [[ -n "$currentUser" && "$currentUser" != "root" ]]; then
-                    if [[ -n $(/usr/bin/sudo -u "$currentUser" /usr/bin/defaults read com.apple.dock "persistent-apps" | /usr/bin/grep "/Applications/Privileges.app") ]]; then
-                        /usr/bin/killall Dock
-                    fi
-                fi
-                
-                # make sure PrivilegesCLI can be accessed without specifying the full path
-                echo "/Applications/Privileges.app/Contents/Resources" > "/private/etc/paths.d/PrivilegesCLI"
-
-            else
-                exitCode=1
-            fi
-        else
-            exitCode=1
+            chmod 644 "$helperPlistPath"
+            launchctl bootstrap system "$helperPlistPath" 2>/dev/null
+            echo "/Applications/Privileges.app/Contents/Resources" > "/private/etc/paths.d/PrivilegesCLI"
         fi
+    fi
+}
+
+install-privileges-helper2(){
+	if [ ! -f /Library/PrivilegedHelperTools/corp.sap.privileges.helper ]; then
+    	/Applications/Privileges.app/Contents/Resources/PrivilegesCLI --install-helper
+	fi
 
 
 }
-#to install installomator from https://github.com/Installomator/Installomator/blob/main/MDM/Installomator%201st%20Auto-install%20DEPNotify.sh
-function downloadAndInstallInstallomator {
-	######################################################################
-	#
-	#  This script made by Søren Theilgaard
-	#  https://github.com/Theile
-	#  Twitter and MacAdmins Slack: @theilgaard
-	#
-	#  Some functions and code from Installomator:
-	#  https://github.com/Installomator/Installomator
-	#
-	######################################################################
-	# MARK: Install Installomator
-	name="Installomator"
-	printlog "$name check for installation"
-	# download URL, version and Expected Team ID
-	# Method for GitHub pkg
-	gitusername="Installomator"
-	gitreponame="Installomator"
-	#printlog "$gitusername $gitreponame"
-	filetype="pkg"
-	downloadURL=$(curl -sfL "https://api.github.com/repos/$gitusername/$gitreponame/releases/latest" | awk -F '"' "/browser_download_url/ && /$filetype\"/ { print \$4; exit }")
-	if [[ "$(echo $downloadURL | grep -ioE "https.*.$filetype")" == "" ]]; then
-		printlog "GitHub API failed, trying failover."
-		#downloadURL="https://github.com$(curl -sfL "https://github.com/$gitusername/$gitreponame/releases/latest" | tr '"' "\n" | grep -i "^/.*\/releases\/download\/.*\.$filetype" | head -1)"
-		downloadURL="https://github.com$(curl -sfL "$(curl -sfL "https://github.com/$gitusername/$gitreponame/releases/latest" | tr '"' "\n" | grep -i "expanded_assets" | head -1)" | tr '"' "\n" | grep -i "^/.*\/releases\/download\/.*\.$filetype" | head -1)"
-	fi
-	#printlog "$downloadURL"
-	appNewVersion=$(curl -sLI "https://github.com/$gitusername/$gitreponame/releases/latest" | grep -i "^location" | tr "/" "\n" | tail -1 | sed 's/[^0-9\.]//g')
-	#printlog "$appNewVersion"
-	expectedTeamID="JME5BW3F3R"
 
-	destFile="/usr/local/Installomator/Installomator.sh"
-	currentInstalledVersion="$(${destFile} version 2>/dev/null || true)"
-	printlog "${destFile} version: $currentInstalledVersion"
-	if [[ ! -e "${destFile}" || "$currentInstalledVersion" != "$appNewVersion" ]]; then
-		printlog "$name not found or version not latest."
-		printlog "${destFile}"
-		printlog "Installing version ${appNewVersion} ..."
-		# Create temporary working directory
-		tmpDir="$(mktemp -d || true)"
-		printlog "Created working directory '$tmpDir'"
-		# Download the installer package
-		printlog "Downloading $name package version $appNewVersion from: $downloadURL"
-		installationCount=0
-		exitCode=9
-		while [[ $installationCount -lt 3 && $exitCode -gt 0 ]]; do
-			curlDownload=$(curl -Ls "$downloadURL" -o "$tmpDir/$name.pkg" || true)
-			curlDownloadStatus=$(echo $?)
-			if [[ $curlDownloadStatus -ne 0 ]]; then
-				printlog "error downloading $downloadURL, with status $curlDownloadStatus"
-				printlog "${curlDownload}"
-				exitCode=1
-			else
-				printlog "Download $name succes."
-				# Verify the download
-				teamID=$(spctl -a -vv -t install "$tmpDir/$name.pkg" 2>&1 | awk '/origin=/ {print $NF }' | tr -d '()' || true)
-				printlog "Team ID for downloaded package: $teamID"
-				# Install the package if Team ID validates
-				if [ "$expectedTeamID" = "$teamID" ] || [ "$expectedTeamID" = "" ]; then
-					printlog "$name package verified. Installing package '$tmpDir/$name.pkg'."
-					pkgInstall=$(installer -verbose -dumplog -pkg "$tmpDir/$name.pkg" -target "/" 2>&1)
-					pkgInstallStatus=$(echo $?)
-					if [[ $pkgInstallStatus -ne 0 ]]; then
-						printlog "ERROR. $name package installation failed."
-						printlog "${pkgInstall}"
-						exitCode=2
-					else
-						printlog "Installing $name package succes."
-						exitCode=0
-					fi
-				else
-					printlog "ERROR. Package verification failed for $name before package installation could start. Download link may be invalid."
-					exitCode=3
-				fi
-			fi
-			((installationCount++))
-			printlog "$installationCount time(s), exitCode $exitCode"
-			if [[ $installationCount -lt 3 ]]; then
-				if [[ $exitCode -gt 0 ]]; then
-					printlog "Sleep a bit before trying download and install again. $installationCount time(s)."
-					printlog "Remove $(rm -fv "$tmpDir/$name.pkg" || true)"
-					sleep 2
-				fi
-			else
-				printlog "Download and install of $name succes."
-			fi
-		done
-		# Remove the temporary working directory
-		printlog "Deleting working directory '$tmpDir' and its contents."
-		printlog "Remove $(rm -Rfv "${tmpDir}" || true)"
-		# Handle installation errors
-		if [[ $exitCode != 0 ]]; then
-			printlog "ERROR. Installation of $name failed. Aborting."
-			caffexit $exitCode
-		else
-			printlog "$name version $appNewVersion installed!"
-		fi
-	else
-		printlog "$name version $appNewVersion already found. Perfect!"
-	fi
+############################################### Installomator bootstrap ##########################
+downloadAndInstallInstallomator() {
+    name="Installomator"
+    printlog "$name check for installation"
+    gitusername="Installomator"
+    gitreponame="Installomator"
+    filetype="pkg"
+    downloadURL=$(curl -sfL "https://api.github.com/repos/$gitusername/$gitreponame/releases/latest" | awk -F '"' "/browser_download_url/ && /$filetype\"/ { print \$4; exit }")
+    if [[ -z "$downloadURL" ]]; then
+        downloadURL="https://github.com$(curl -sfL "$(curl -sfL "https://github.com/$gitusername/$gitreponame/releases/latest" | tr '\"' '\n' | grep -i 'expanded_assets' | head -1)" | tr '\"' '\n' | grep -i "^/.*\/releases\/download\/.*\.$filetype" | head -1)"
+    fi
+    appNewVersion=$(curl -sLI "https://github.com/$gitusername/$gitreponame/releases/latest" | grep -i "^location" | tr "/" "\n" | tail -1 | sed 's/[^0-9\.]//g')
+    expectedTeamID="JME5BW3F3R"
 
+    destFile="/usr/local/Installomator/Installomator.sh"
+    currentInstalledVersion="$(${destFile} version 2>/dev/null || true)"
+    printlog "${destFile} version: $currentInstalledVersion"
+
+    if [[ ! -e "${destFile}" || "$currentInstalledVersion" != "$appNewVersion" ]]; then
+        printlog "$name not found or not latest. Installing $appNewVersion"
+        tmpDir="$(mktemp -d || true)"
+        printlog "Working dir: $tmpDir"
+        installationCount=0
+        exitCode=9
+        while [[ $installationCount -lt 3 && $exitCode -gt 0 ]]; do
+            curl -Ls "$downloadURL" -o "$tmpDir/$name.pkg"
+            curlDownloadStatus=$?
+            if [[ $curlDownloadStatus -ne 0 ]]; then
+                printlog "Download error ($curlDownloadStatus)"
+                exitCode=1
+            else
+                teamID=$(spctl -a -vv -t install "$tmpDir/$name.pkg" 2>&1 | awk '/origin=/ {print $NF }' | tr -d '()' || true)
+                printlog "Team ID: $teamID"
+                if [[ "$expectedTeamID" = "$teamID" ]] || [[ -z "$expectedTeamID" ]]; then
+                    pkgInstall=$(installer -verbose -dumplog -pkg "$tmpDir/$name.pkg" -target "/" 2>&1)
+                    pkgInstallStatus=$?
+                    if [[ $pkgInstallStatus -ne 0 ]]; then
+                        printlog "Install error: $pkgInstall"
+                        exitCode=2
+                    else
+                        printlog "$name installed."
+                        exitCode=0
+                    fi
+                else
+                    printlog "Team ID mismatch."
+                    exitCode=3
+                fi
+            fi
+            ((installationCount++))
+            if [[ $installationCount -lt 3 && $exitCode -gt 0 ]]; then
+                printlog "Retrying... ($installationCount)"
+                rm -f "$tmpDir/$name.pkg"
+                sleep 2
+            fi
+        done
+        printlog "Remove $(rm -Rfv "${tmpDir}" || true)"
+        if [[ $exitCode != 0 ]]; then
+            printlog "ERROR. Installation of $name failed. Aborting."
+            caffexit $exitCode
+        fi
+    else
+        printlog "$name version $appNewVersion already installed."
+    fi
 }
-#base vars
-logFolder="/var/log/intune"
-dir="/Users/Shared/Lab9Pro"
-mkdir $dir
+housekeeping_check_firstrun() {
+    logging "---- Housekeeping check ----"
+    
+    currentUser="$(stat -f "%Su" /dev/console)"
+    userHome="$(dscl . -read /Users/"$currentUser" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+    [[ -z "$userHome" ]] && userHome="/Users/$currentUser"
+    firstrunExpected="$userHome/Lab9Pro/firstrun"
 
-[[ -d $logFolder ]] || mkdir $logFolder
-chmod 755 $logFolder
-fixlog=$logFolder"/intune-fundamentals-install.log"
-touch $fixlog
-readonly fixlog
-main;
+    logging "Console user  : $currentUser"
+    logging "User home     : $userHome"
+    logging "Expected path : $firstrunExpected"
+
+    if [[ -f "$firstrunExpected" ]]; then
+        owner="$(stat -f "%Su" "$firstrunExpected" 2>/dev/null)"
+        perms="$(stat -f "%Lp" "$firstrunExpected" 2>/dev/null)"
+        logging "firstrun file FOUND. Owner=$owner, Permissions=$perms"
+    else
+        logging "firstrun file NOT found for $currentUser"
+        if [[ -f "/Users/Shared/Lab9Pro/firstrun" ]]; then
+            logging "Legacy marker detected in /Users/Shared/Lab9Pro/firstrun"
+        fi
+    fi
+    logging "---- End housekeeping ----"
+}
+
+
+############################################### Housekeeping #####################################
+caffexit () {
+    housekeeping_check_firstrun
+    kill "$caffeinatepid" 2>/dev/null || true
+    printlog "[LOG-END] Status $1"
+    exit $1
+}
+
+############################################### Start ############################################
+main

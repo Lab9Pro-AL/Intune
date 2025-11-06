@@ -1,47 +1,63 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.1">
+<plist version="1.0">
 <dict>
 	<key>PayloadContent</key>
 	<array>
+		<!-- Privileges 2 settings -->
 		<dict>
-			<key>DockToggleMaxTimeout</key>
-			<integer>31</integer>
-			<key>DockToggleTimeout</key>
-			<integer>30</integer>
 			<key>PayloadDisplayName</key>
-			<string>SAP Privileges app</string>
+			<string>SAP Privileges 2 Configuration</string>
 			<key>PayloadIdentifier</key>
-			<string>corp.sap.privileges.D5BDF3DF-6BAE-442F-B0D2-A5F873479E09</string>
+			<string>corp.sap.privileges2.3F93D49E-6C1C-4A72-BA9C-121B52A2A97E</string>
 			<key>PayloadType</key>
-			<string>corp.sap.privileges</string>
+			<string>corp.sap.privileges2</string>
 			<key>PayloadUUID</key>
-			<string>D5BDF3DF-6BAE-442F-B0D2-A5F873479E09</string>
+			<string>3F93D49E-6C1C-4A72-BA9C-121B52A2A97E</string>
 			<key>PayloadVersion</key>
 			<integer>1</integer>
-			<key>ReasonMinLength</key>
-			<integer>10</integer>
-			<key>ReasonRequired</key>
-			<true/>
+
+			<!-- Privileges 2 keys -->
 			<key>RequireAuthentication</key>
 			<true/>
+			<key>ReasonRequired</key>
+			<true/>
+			<key>ReasonMinLength</key>
+			<integer>10</integer>
 			<key>ShowInMenuBar</key>
 			<true/>
+			<key>DockToggleTimeout</key>
+			<integer>30</integer>
+			<key>DockToggleMaxTimeout</key>
+			<integer>31</integer>
 		</dict>
+
+		<!-- Notifications for Privileges 2 -->
 		<dict>
+			<key>PayloadDisplayName</key>
+			<string>Notifications</string>
+			<key>PayloadIdentifier</key>
+			<string>com.apple.notificationsettings.5E4F4C6D-A1D7-4A62-97A1-2D9F719EAB42</string>
+			<key>PayloadType</key>
+			<string>com.apple.notificationsettings</string>
+			<key>PayloadUUID</key>
+			<string>5E4F4C6D-A1D7-4A62-97A1-2D9F719EAB42</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+
 			<key>NotificationSettings</key>
 			<array>
 				<dict>
+					<key>BundleIdentifier</key>
+					<string>corp.sap.privileges2</string>
+					<key>NotificationsEnabled</key>
+					<true/>
 					<key>AlertType</key>
 					<integer>1</integer>
 					<key>BadgesEnabled</key>
 					<true/>
-					<key>BundleIdentifier</key>
-					<string>corp.sap.privileges</string>
 					<key>CriticalAlertEnabled</key>
 					<false/>
-					<key>NotificationsEnabled</key>
-					<true/>
 					<key>PreviewType</key>
 					<integer>1</integer>
 					<key>ShowInCarPlay</key>
@@ -54,26 +70,18 @@
 					<true/>
 				</dict>
 			</array>
-			<key>PayloadDisplayName</key>
-			<string>Notifications</string>
-			<key>PayloadIdentifier</key>
-			<string>com.apple.notificationsettings.8F1F2F36-BC14-426F-AE81-4A7A09CE0DCF</string>
-			<key>PayloadType</key>
-			<string>com.apple.notificationsettings</string>
-			<key>PayloadUUID</key>
-			<string>8F1F2F36-BC14-426F-AE81-4A7A09CE0DCF</string>
-			<key>PayloadVersion</key>
-			<integer>1</integer>
 		</dict>
 	</array>
+
+	<!-- Root payload -->
 	<key>PayloadDisplayName</key>
-	<string>Untitled 2</string>
+	<string>SAP Privileges 2</string>
 	<key>PayloadIdentifier</key>
-	<string>LLab9Pro</string>
+	<string>com.lab9pro.sapprivileges2profile</string>
 	<key>PayloadType</key>
 	<string>Configuration</string>
 	<key>PayloadUUID</key>
-	<string>1125DB37-84B9-4B31-8073-5420638870CF</string>
+	<string>B12A1C5B-2E52-4C56-BA7C-74A8D246A3E4</string>
 	<key>PayloadVersion</key>
 	<integer>1</integer>
 </dict>
