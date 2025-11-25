@@ -68,7 +68,7 @@
 
 # Installomator auto-updater parameters (can be overridden by Intune script parameters 4..9)
 interactiveMode="${4:="1"}"
-ignoredLabels="${5:=""}"
+ignoredLabels="privileges privileges2"
 requiredLabels="${6:=""}"
 optionalLabels="${7:=""}"
 installomatorOptions="${8:-""}"
