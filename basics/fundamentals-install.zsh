@@ -1,5 +1,5 @@
 #!/bin/zsh
-#v1.5
+#v1.5.1
 
 #############################################################################################################
 #                                      Created by Raf Vandelaer                                             #
@@ -282,7 +282,7 @@ main() {
 
             if [[ $isAllowedToBecomeAdmin -eq 1 ]]; then
                 installomatorInstall privileges2
-                install-privileges-helper2
+                #install-privileges-helper2
                 dockitems+=("/Applications/Privileges.app")
             fi
 
